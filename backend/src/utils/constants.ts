@@ -1,0 +1,53 @@
+export const ORDER_STATUS = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const PAYMENT_STATUS = {
+  PENDING: 'PENDING',
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  VERIFIED: 'VERIFIED',
+  FAILED: 'FAILED',
+} as const;
+
+export const DELIVERY_STATUS = {
+  WAITING: 'WAITING',
+  PROCESSING: 'PROCESSING',
+  SHIPPED: 'SHIPPED',
+  DELIVERED: 'DELIVERED',
+} as const;
+
+export const PRODUCT_CATEGORIES = {
+  GAME: 'GAME',
+  CURRENCY: 'CURRENCY',
+} as const;
+
+export const GAME_TYPES = {
+  PUBG: 'PUBG',
+  FREE_FIRE: 'FREE_FIRE',
+  GTA: 'GTA',
+  MLBB: 'MLBB',
+  VALORANT: 'VALORANT',
+  OTHERS: 'OTHERS',
+} as const;
+
+export const PAYMENT_METHODS = {
+  BKASH: 'BKASH',
+  NAGAD: 'NAGAD',
+  ROCKET: 'ROCKET',
+} as const;
+
+export const USER_ROLES = {
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+  SUPER_ADMIN: 'SUPER_ADMIN',
+} as const;
+
+export const FEEDBACK_CATEGORIES = {
+  BUG: 'BUG',
+  FEATURE_REQUEST: 'FEATURE_REQUEST',
+  COMPLAINT: 'COMPLAINT',
+  OTHER: 'OTHER',
+} as const;

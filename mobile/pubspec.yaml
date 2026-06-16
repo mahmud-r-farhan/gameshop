@@ -1,0 +1,32 @@
+name: gameshop_mobile
+description: GameShop Mobile App - Gaming Products Marketplace
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  dio: ^5.4.0
+  provider: ^6.1.1
+  get: ^4.6.6
+  shared_preferences: ^2.2.2
+  cached_network_image: ^3.3.1
+  fluttertoast: ^8.2.4
+  shimmer: ^3.0.0
+  intl: ^0.19.0
+  url_launcher: ^6.2.2
+  socket_io_client: ^2.0.3+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

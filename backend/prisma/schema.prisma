@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  phone         String?
+  passwordHash  String   @map("password_hash")
+  fullName      String   @map("full_name")
+  avatarUrl     String?  @map("avatar_url")
+  role          UserRole @default(USER)
+  
+  // Address
+  division      String?
+  district      String?
+  address       String?
+  postalCode    String?  @map("postal_code")
+  
+  // Account Status
+  emailVerified Boolean  @default(false) @map("email_verified")
+  phoneVerified Boolean  @default(false) @map("phone_verified")
+  isActive      Boolean  @default(true) @map("is_active")
+  
+  // Preferences
+  preferredPaymentMethod String? @map("preferred_payment_method")
+  notificationPreferences Json?  @default("{}") @map("notification_preferences")
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  lastLogin DateTime? @map("last_login")
+
+  // Relations
+  orders            Order[]
+  reviews           Review[]
+  payments          Payment[]
+  feedbacks         CustomerFeedback[]
+  createdProducts   Product[]            @relation("CreatedProducts")
+  createdPromotions Promotion[]         @relation("CreatedPromotions")
+  verifiedPayments  Payment[]           @relation("VerifiedPayments")
+  orderVerifications Order[]            @relation("VerifiedOrders")
+  statusChanges     OrderStatusHistory[]
+  repliedFeedbacks  CustomerFeedback[]  @relation("RepliedFeedbacks")
+  settings          AdminSettings[]
+
+  @@map("users")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  category    String   // 'GAME', 'CURRENCY'
+  gameType    String?  @map("game_type") // 'PUBG', 'FREE_FIRE', 'GTA', etc.
+  
+  price       Decimal  @db.Decimal(10, 2)
+  originalPrice Decimal? @map("original_price") @db.Decimal(10, 2)
+  currency    String   @default("BDT")
+  
+  // Stock
+  quantityAvailable Int      @default(-1) @map("quantity_available") // -1 = infinite
+  isAvailable       Boolean  @default(true) @map("is_available")
+  isFeatured        Boolean  @default(false) @map("is_featured")
+  
+  // Media
+  thumbnailUrl String? @map("thumbnail_url")
+  images       Json?
+  
+  // Metadata
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  creator     User?             @relation("CreatedProducts", fields: [createdBy], references: [id])
+  specs       ProductSpec[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  promotions  Promotion[]       @relation("PromotionProducts")
+
+  @@map("products")
+}
+
+model ProductSpec {
+  id           String @id @default(uuid())
+  productId    String @map("product_id")
+  
+  specName     String? @map("specification_name")
+  specValue    String? @map("specification_value")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_specs")
+}
+
+model Promotion {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  description     String?
+  discountType    String   @map("discount_type") // 'PERCENTAGE', 'FIXED'
+  discountValue   Decimal  @map("discount_value") @db.Decimal(10, 2)
+  
+  validFrom       DateTime @map("valid_from")
+  validUntil      DateTime @map("valid_until")
+  maxUsage        Int?     @map("max_usage")
+  usedCount       Int      @default(0) @map("used_count")
+  
+  minPurchaseAmount Decimal? @map("min_purchase_amount") @db.Decimal(10, 2)
+  
+  isActive        Boolean  @default(true) @map("is_active")
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  creator         User?    @relation("CreatedPromotions", fields: [createdBy], references: [id])
+  orders          Order[]
+  applicableProducts Product[] @relation("PromotionProducts")
+
+  @@map("promotions")
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String  @map("order_id")
+  productId  String  @map("product_id")
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2)
+  productName String? @map("product_name")
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  orderNumber     String   @unique @map("order_number")
+  userId          String   @map("user_id")
+  
+  // Pricing
+  subtotal        Decimal  @db.Decimal(10, 2)
+  discountAmount  Decimal  @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  taxAmount       Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(10, 2)
+  
+  // Discount
+  promoCode       String?  @map("promo_code")
+  promoId         String?  @map("promo_id")
+  
+  // Delivery
+  deliveryAddress       String  @map("delivery_address")
+  deliveryInstructions  String? @map("delivery_instructions")
+  
+  // Status
+  paymentStatus  String  @default("PENDING") @map("payment_status")
+  orderStatus    String  @default("PENDING") @map("order_status")
+  deliveryStatus String  @default("WAITING") @map("delivery_status")
+  
+  // Payment Tracking
+  transactionId      String?  @map("transaction_id")
+  paymentMethod      String?  @map("payment_method")
+  paymentVerifiedBy  String?  @map("payment_verified_by")
+  paymentVerifiedAt  DateTime? @map("payment_verified_at")
+  
+  // Timeline
+  createdAt          DateTime @default(now()) @map("created_at")
+  paymentCompletedAt DateTime? @map("payment_completed_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  
+  // Notifications
+  reviewSentAt DateTime? @map("review_sent_at")
+
+  // Relations
+  user          User                @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  promotion     Promotion?          @relation(fields: [promoId], references: [id])
+  payments      Payment[]
+  reviews       Review[]
+  statusHistory OrderStatusHistory[]
+  verifiedBy    User?               @relation("VerifiedOrders", fields: [paymentVerifiedBy], references: [id])
+
+  @@map("orders")
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(uuid())
+  orderId    String   @map("order_id")
+  
+  statusType String?  @map("status_type") // 'payment_status', 'order_status', 'delivery_status'
+  oldStatus  String?  @map("old_status")
+  newStatus  String?  @map("new_status")
+  
+  changedBy  String?  @map("changed_by")
+  reason     String?
+  
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedByUser User? @relation(fields: [changedBy], references: [id])
+
+  @@map("order_status_history")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  orderId   String   @map("order_id")
+  userId    String   @map("user_id")
+  
+  rating    Int      // 1-5
+  comment   String?
+  
+  isVerifiedPurchase Boolean @default(true) @map("is_verified_purchase")
+  helpfulCount       Int    @default(0) @map("helpful_count")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, orderId])
+  @@map("reviews")
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  userId         String   @map("user_id")
+  
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @default("BDT")
+  
+  paymentMethod  String   @map("payment_method") // 'BKASH', 'NAGAD', 'ROCKET'
+  transactionId  String?  @unique @map("transaction_id")
+  
+  status         String   @default("PENDING") // PENDING, VERIFIED, FAILED
+  
+  // For manual verification
+  paymentProofUrl String? @map("payment_proof_url")
+  verifiedBy     String?  @map("verified_by")
+  verificationNote String? @map("verification_note")
+  verifiedAt     DateTime? @map("verified_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id])
+  verifiedByUser User? @relation("VerifiedPayments", fields: [verifiedBy], references: [id])
+
+  @@map("payments")
+}
+
+model CustomerFeedback {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  
+  subject   String
+  message   String
+  category  String?  // 'BUG', 'FEATURE_REQUEST', 'COMPLAINT', 'OTHER'
+  
+  status    String   @default("OPEN") // 'OPEN', 'IN_PROGRESS', 'RESOLVED'
+  
+  adminReply String? @map("admin_reply")
+  repliedBy  String? @map("replied_by")
+  repliedAt  DateTime? @map("replied_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User    @relation(fields: [userId], references: [id])
+  repliedByUser User? @relation("RepliedFeedbacks", fields: [repliedBy], references: [id])
+
+  @@map("customer_feedback")
+}
+
+model PaymentGateway {
+  id                String   @id @default(uuid())
+  
+  gatewayName       String   @unique @map("gateway_name")
+  gatewayType       String?  @map("gateway_type") // 'MOBILE_BANKING', 'API'
+  
+  accountIdentifier  String? @map("account_identifier")
+  accountHolderName  String? @map("account_holder_name")
+  
+  instructions      String?
+  qrCodeUrl         String?  @map("qr_code_url")
+  
+  isEnabled         Boolean  @default(true) @map("is_enabled")
+  displayOrder      Int?     @map("display_order")
+  
+  settings          Json?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_gateways")
+}
+
+model AdminSettings {
+  id          String   @id @default(uuid())
+  settingKey  String   @unique @map("setting_key")
+  settingValue Json?   @map("setting_value")
+  settingType String?  @map("setting_type")
+  description String?
+  
+  updatedBy   String?  @map("updated_by")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  updatedByUser User?  @relation(fields: [updatedBy], references: [id])
+
+  @@map("admin_settings")
+}

@@ -1,0 +1,23 @@
+{
+  "name": "gameshop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GameShop E-Commerce Platform - Gaming Products Marketplace",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "admin"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:admin\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:admin": "npm run dev -w admin",
+    "build": "npm run build -w backend && npm run build -w frontend && npm run build -w admin",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "test": "npm run test -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
