@@ -50,10 +50,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: cd backend && npm ci
+        run: npm ci
 
       - name: Generate Prisma client
         run: cd backend && npx prisma generate
