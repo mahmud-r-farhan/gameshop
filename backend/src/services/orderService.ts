@@ -1,10 +1,11 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { generateOrderNumber, calculateDiscount } from '../utils/helpers.js';
 
 export class OrderService {
   async createOrder(userId: string, items: { productId: string; quantity: number }[], promoCode?: string, deliveryAddress?: string, deliveryInstructions?: string) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       let promoData = null;
       if (promoCode) {
         promoData = await tx.promotion.findUnique({ where: { code: promoCode } });
@@ -257,13 +258,13 @@ export class OrderService {
 
       const totalOrders = orders.length;
       const totalRevenue = orders
-        .filter(o => o.paymentStatus === 'VERIFIED')
-        .reduce((sum, o) => sum + Number(o.totalAmount), 0);
-      const pendingPayments = orders.filter(o => o.paymentStatus === 'PENDING' || o.paymentStatus === 'PENDING_VERIFICATION').length;
-      const deliveredOrders = orders.filter(o => o.deliveryStatus === 'DELIVERED').length;
+        .filter((o: any) => o.paymentStatus === 'VERIFIED')
+        .reduce((sum: number, o: any) => sum + Number(o.totalAmount), 0);
+      const pendingPayments = orders.filter((o: any) => o.paymentStatus === 'PENDING' || o.paymentStatus === 'PENDING_VERIFICATION').length;
+      const deliveredOrders = orders.filter((o: any) => o.deliveryStatus === 'DELIVERED').length;
 
       const paymentMethods: Record<string, number> = {};
-      payments.forEach(p => {
+      payments.forEach((p: any) => {
         const method = p.paymentMethod.toLowerCase();
         paymentMethods[method] = (paymentMethods[method] || 0) + 1;
       });
@@ -288,7 +289,7 @@ export class OrderService {
       today,
       weekly,
       monthly,
-      topProducts: topProducts.map(p => ({
+      topProducts: topProducts.map((p: any) => ({
         name: p.productName,
         sales: p._sum.quantity || 0,
       })),

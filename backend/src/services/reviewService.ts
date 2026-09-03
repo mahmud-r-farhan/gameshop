@@ -72,7 +72,7 @@ export class ReviewService {
     });
 
     const result: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    distribution.forEach(d => {
+    distribution.forEach((d: any) => {
       result[d.rating] = d._count;
     });
 
