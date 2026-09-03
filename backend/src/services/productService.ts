@@ -46,7 +46,7 @@ export class ProductService {
       prisma.product.count({ where }),
     ]);
 
-    const productsWithRating = products.map(p => {
+    const productsWithRating = products.map((p: any) => {
       const avgRating = p.reviews.length > 0
         ? p.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / p.reviews.length
         : 0;
