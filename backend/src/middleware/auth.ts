@@ -1,6 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env.js';
+import { ForbiddenError, UnauthorizedError } from '../middleware/errorHandler.js';
+import { verifyAccessToken, type AccessTokenPayload } from '../utils/tokens.js';
+import { USER_ROLES } from '../utils/constants.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -10,54 +12,116 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+/**
+ * Extract a bearer token.
+ *
+ * Tolerates a lower/upper-case scheme and arbitrary internal whitespace — a
+ * naive `split(' ')` returns an empty token for `"Bearer  abc"`, which some HTTP
+ * clients and hand-rolled integrations do emit.
+ */
+export function extractBearerToken(headerValue?: string | string[]): string | null {
+  const header = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  if (!header || typeof header !== 'string') return null;
+
+  const match = /^\s*bearer\s+(\S+)\s*$/i.exec(header);
+  return match ? match[1] : null;
+}
+
+function decode(headerValue?: string | string[]): AccessTokenPayload | null {
+  const token = extractBearerToken(headerValue);
+  if (!token) return null;
+  try {
+    return verifyAccessToken(token);
+  } catch {
+    return null;
+  }
+}
+
+/** Reject the request unless a valid access token is present. */
+export function authenticateToken(req: AuthRequest, _res: Response, next: NextFunction): void {
+  const token = extractBearerToken(req.headers['authorization']);
 
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Access token required' });
+    next(new UnauthorizedError('Access token required'));
+    return;
   }
 
   try {
-    const decoded = jwt.verify(token, env.jwt.secret) as { id: string; email: string; role: string };
-    req.user = decoded;
+    req.user = verifyAccessToken(token);
     next();
-  } catch (err) {
-    return res.status(403).json({ success: false, error: 'Invalid or expired token' });
+  } catch {
+    // 401 (not 403) for a bad/expired token: the client is *unauthenticated*,
+    // and the frontend interceptor keys off 401 to clear the session.
+    next(new UnauthorizedError('Invalid or expired token'));
   }
-};
+}
 
-export const optionalAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+/** Attach the user when a valid token is present, but never block. */
+export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {
+  const decoded = decode(req.headers['authorization']);
+  if (decoded) req.user = decoded;
+  next();
+}
 
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, env.jwt.secret) as { id: string; email: string; role: string };
-      req.user = decoded;
-    } catch {
-      // Token invalid, continue without auth
+function isPrivileged(role: string | undefined): boolean {
+  return role === USER_ROLES.ADMIN || role === USER_ROLES.SUPER_ADMIN;
+}
+
+/** Restrict to administrators. Must run after `authenticateToken`. */
+export function adminOnly(req: AuthRequest, _res: Response, next: NextFunction): void {
+  if (!req.user) {
+    next(new UnauthorizedError('Authentication required'));
+    return;
+  }
+  if (!isPrivileged(req.user.role)) {
+    next(new ForbiddenError('Admin access required'));
+    return;
+  }
+  next();
+}
+
+/** Restrict to super administrators. Must run after `authenticateToken`. */
+export function superAdminOnly(req: AuthRequest, _res: Response, next: NextFunction): void {
+  if (!req.user) {
+    next(new UnauthorizedError('Authentication required'));
+    return;
+  }
+  if (req.user.role !== USER_ROLES.SUPER_ADMIN) {
+    next(new ForbiddenError('Super admin access required'));
+    return;
+  }
+  next();
+}
+
+/** Composable role gate: `requireRole('ADMIN', 'SUPER_ADMIN')`. */
+export function requireRole(...roles: string[]) {
+  const allowed = new Set(roles);
+  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(new UnauthorizedError('Authentication required'));
+      return;
     }
-  }
-  next();
-};
+    if (!allowed.has(req.user.role)) {
+      next(new ForbiddenError(`Requires role: ${roles.join(' or ')}`));
+      return;
+    }
+    next();
+  };
+}
 
-export const adminOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
-  }
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ success: false, error: 'Admin access required' });
-  }
-  next();
-};
+/** True when the caller may act on resources owned by `ownerId`. */
+export function canAccessResource(req: AuthRequest, ownerId: string): boolean {
+  if (!req.user) return false;
+  return req.user.id === ownerId || isPrivileged(req.user.role);
+}
 
-export const superAdminOnly = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return res.status(401).json({ success: false, error: 'Authentication required' });
+/**
+ * Refuse the request in production when the deployment is still using a
+ * placeholder signing key. `env.ts` already exits on boot, but this guards
+ * against a config object built by tests or an older cached module.
+ */
+export function assertJwtConfigured(): void {
+  if (env.isProd && env.jwt.secret.startsWith('dev-')) {
+    throw new Error('JWT_SECRET is not configured');
   }
-  if (req.user.role !== 'SUPER_ADMIN') {
-    return res.status(403).json({ success: false, error: 'Super admin access required' });
-  }
-  next();
-};
+}
