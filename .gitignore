@@ -8,3 +8,5 @@ build/
 coverage/
 .turbo/
 *.tsbuildinfo
+coverage-integration/
+*.lcov
