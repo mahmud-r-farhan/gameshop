@@ -10,7 +10,7 @@ COPY tsconfig.node.json ./
 COPY index.html ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
