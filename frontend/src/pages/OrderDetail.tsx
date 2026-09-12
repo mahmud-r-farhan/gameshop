@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { orderAPI } from '@/services/api';
-import { ArrowLeft, Package, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const OrderDetail = () => {
@@ -13,18 +13,18 @@ export const OrderDetail = () => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (id) loadOrder();
-  }, [id]);
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
       const res = await orderAPI.getById(id!);
       setOrder(res.data.data);
     } catch (err) {
       toast.error('Order not found');
     } finally { setLoading(false); }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadOrder();
+  }, [id, loadOrder]);
 
   if (loading) return <div className="container px-4 py-20 text-center"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" /></div>;
   if (!order) return <div className="container px-4 py-20 text-center"><h2 className="text-2xl font-bold">Order not found</h2><Link to="/orders"><Button variant="link"><ArrowLeft className="mr-1 h-4 w-4" />Back to Orders</Button></Link></div>;

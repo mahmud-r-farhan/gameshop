@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { productAPI, reviewAPI } from '@/services/api';
 import { useCartStore } from '@/store/useCartStore';
@@ -12,15 +11,11 @@ import toast from 'react-hot-toast';
 export const ProductDetail = () => {
   const { id } = useParams();
   const [product, setProduct] = useState<any>(null);
-  const [reviews, setReviews] = useState<any>(null);
+  const [, setReviews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { addItem } = useCartStore();
 
-  useEffect(() => {
-    if (id) loadProduct();
-  }, [id]);
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       const res = await productAPI.getById(id!);
       setProduct(res.data.data);
@@ -29,7 +24,11 @@ export const ProductDetail = () => {
     } catch (err) {
       toast.error('Product not found');
     } finally { setLoading(false); }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadProduct();
+  }, [id, loadProduct]);
 
   if (loading) return <div className="container px-4 py-20 text-center"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" /></div>;
   if (!product) return <div className="container px-4 py-20 text-center"><h2 className="text-2xl font-bold">Product not found</h2><Link to="/products"><Button variant="link"><ArrowLeft className="mr-1 h-4 w-4" />Back to Products</Button></Link></div>;
