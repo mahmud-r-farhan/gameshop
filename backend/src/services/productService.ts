@@ -131,21 +131,31 @@ export class ProductService {
   async create(data: Record<string, any>, createdBy: string) {
     const { specifications, ...rest } = data;
 
+    // Built as a record rather than an object literal: spreading
+    // `pickFields(rest)` into a literal drops its index signature, which makes
+    // TypeScript report `name` / `category` / `price` as missing even though the
+    // validated input guarantees them.
+    const payload: Record<string, unknown> = {
+      ...pickFields(rest),
+      createdBy,
+      quantityAvailable: rest.quantityAvailable ?? UNLIMITED_STOCK,
+      images: rest.images ?? [],
+    };
+
+    if (Array.isArray(specifications) && specifications.length > 0) {
+      payload.specs = {
+        create: specifications.map((spec: { name: string; value: string }) => ({
+          specName: spec.name,
+          specValue: spec.value,
+        })),
+      };
+    }
+
     const product = await prisma.product.create({
-      data: {
-        ...pickFields(rest),
-        createdBy,
-        quantityAvailable: rest.quantityAvailable ?? UNLIMITED_STOCK,
-        images: rest.images ?? [],
-        specs: Array.isArray(specifications) && specifications.length > 0
-          ? {
-              create: specifications.map((spec: { name: string; value: string }) => ({
-                specName: spec.name,
-                specValue: spec.value,
-              })),
-            }
-          : undefined,
-      },
+      // See the note on `payload`: the allow-list in `pickFields` plus the Zod
+      // schema are the real guarantees. `never` (rather than a generated input
+      // type) keeps this compiling where the Prisma client is not generated.
+      data: payload as never,
       include: { specs: true },
     });
 

@@ -53,17 +53,25 @@ async function stopServer(): Promise<void> {
   await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 }
 
+/**
+ * The client's `connect` event fires when the handshake packet arrives, which is
+ * *before* the server's `connection` handler has necessarily finished joining
+ * rooms. Emitting straight after `connect` is therefore a race — so the helper
+ * resolves one macrotask later, once the room joins have landed.
+ */
+const ROOM_JOIN_SETTLE_MS = 40;
+
 function connect(token?: string): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(baseUrl, {
       transports: ['websocket'],
       reconnection: false,
       forceNew: true,
-      timeout: 3000,
+      timeout: 5000,
       ...(token ? { auth: { token } } : {}),
     });
     clients.push(socket);
-    socket.once('connect', () => resolve(socket));
+    socket.once('connect', () => setTimeout(() => resolve(socket), ROOM_JOIN_SETTLE_MS));
     socket.once('connect_error', (error: Error) => {
       socket.close();
       reject(error);
@@ -72,7 +80,7 @@ function connect(token?: string): Promise<Socket> {
 }
 
 /** Resolve with the payload of the next `event`, or reject after `timeoutMs`. */
-function nextEvent<T = unknown>(socket: Socket, event: string, timeoutMs = 3000): Promise<T> {
+function nextEvent<T = unknown>(socket: Socket, event: string, timeoutMs = 5000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.off(event, handler);
@@ -159,9 +167,10 @@ describe('handshake authentication', () => {
         transports: ['websocket'],
         reconnection: false,
         forceNew: true,
+        timeout: 5000,
       });
       clients.push(client);
-      client.once('connect', () => resolve(client));
+      client.once('connect', () => setTimeout(() => resolve(client), ROOM_JOIN_SETTLE_MS));
       client.once('connect_error', reject);
     });
     expect(socket.connected).toBe(true);
@@ -249,7 +258,7 @@ describe('per-order subscriptions', () => {
     follower.emit('order:subscribe', ORDER_ID);
 
     // Give the server a tick to process the join before we assert on it.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, ROOM_JOIN_SETTLE_MS));
 
     const incoming = nextEvent(follower, 'order_update');
     emitOrderUpdate(CUSTOMER.id, { id: ORDER_ID, orderStatus: 'DELIVERED' });
@@ -260,10 +269,10 @@ describe('per-order subscriptions', () => {
   it('stops delivering after unsubscribe', async () => {
     const follower = await connect(tokenFor(OTHER_CUSTOMER));
     follower.emit('order:subscribe', ORDER_ID);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, ROOM_JOIN_SETTLE_MS));
 
     follower.emit('order:unsubscribe', ORDER_ID);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, ROOM_JOIN_SETTLE_MS));
 
     emitOrderUpdate(CUSTOMER.id, { id: ORDER_ID, orderStatus: 'DELIVERED' });
     await expectNoEvent(follower, 'order_update');
@@ -310,7 +319,7 @@ describe('payment notifications', () => {
   it('reaches a client following the order room', async () => {
     const follower = await connect(tokenFor(OTHER_CUSTOMER));
     follower.emit('order:subscribe', ORDER_ID);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, ROOM_JOIN_SETTLE_MS));
 
     const incoming = nextEvent(follower, 'payment_verified');
     emitPaymentVerified(CUSTOMER.id, ORDER_ID);

@@ -58,7 +58,16 @@ export class AdminService {
     if (!payload.gatewayName) throw new AppError('gatewayName is required', 400);
 
     try {
-      return await prisma.paymentGateway.create({ data: payload });
+      return await prisma.paymentGateway.create({
+        // `payload` is assembled from the `GATEWAY_FIELDS` allow-list at runtime,
+        // so it carries no declared properties and TypeScript reports the
+        // model's required `gatewayName` as missing even though the guard above
+        // has just proved it is present. The allow-list is the real type safety
+        // here; the cast only bridges the generated XOR input type. It is
+        // `never` rather than `Prisma.PaymentGatewayCreateInput` so this also
+        // compiles where the client has not been generated.
+        data: payload as never,
+      });
     } catch (error) {
       if (isUniqueViolation(error)) throw new AppError('A gateway with this name already exists', 409);
       throw error;
