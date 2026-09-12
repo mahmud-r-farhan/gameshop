@@ -1,74 +1,121 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
-import { env } from '../config/env.js';
+import crypto from 'node:crypto';
+import {
+  calculateDiscountCents,
+  applyPercentageDiscount,
+  formatCurrency,
+  fromCents,
+  toCents,
+  toDecimalString,
+  roundMoney,
+} from './money.js';
+import { buildPagination } from './pagination.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generatePasswordResetToken,
+  generateOTP,
+} from './tokens.js';
 
-export const generateOrderNumber = (): string => {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+export {
+  calculateDiscountCents,
+  applyPercentageDiscount,
+  formatCurrency,
+  fromCents,
+  toCents,
+  toDecimalString,
+  roundMoney,
+  buildPagination,
+  generateAccessToken,
+  generateRefreshToken,
+  generatePasswordResetToken,
+  generateOTP,
+};
+
+/**
+ * Human-friendly, collision-resistant order number.
+ *
+ * `Date.now().toString(36)` + 4 chars of `Math.random()` gave roughly 1.6M
+ * combinations per millisecond bucket. Because `orderNumber` is `@unique`, two
+ * concurrent checkouts could collide and surface as a raw 500. A CSPRNG widens
+ * the space to 2^80 and is still sortable by the leading timestamp.
+ */
+export function generateOrderNumber(date: Date = new Date()): string {
+  const timestamp = date.getTime().toString(36).toUpperCase().padStart(9, '0');
+  const random = crypto
+    .randomBytes(6)
+    .toString('base64url')
+    .replace(/[^A-Za-z0-9]/g, '')
+    .toUpperCase()
+    .padEnd(6, '0')
+    .slice(0, 6);
   return `ORD-${timestamp}-${random}`;
-};
+}
 
-export const generateTransactionId = (): string => {
-  return `TRX-${uuidv4().substring(0, 8).toUpperCase()}`;
-};
+/** Internal payment reference (distinct from the customer's gateway TxID). */
+export function generateTransactionId(): string {
+  return `TRX-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+}
 
-export const hashPassword = async (password: string): Promise<string> => {
-  return bcrypt.hash(password, 10);
-};
+export const BCRYPT_ROUNDS = 10;
 
-export const comparePassword = async (password: string, hash: string): Promise<boolean> => {
-  return bcrypt.compare(password, hash);
-};
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
 
-export const generateAccessToken = (user: { id: string; email: string; role: string }): string => {
-  return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    env.jwt.secret,
-    { expiresIn: env.jwt.expiresIn as any }
-  );
-};
-
-export const generateRefreshToken = (userId: string): string => {
-  return jwt.sign(
-    { id: userId },
-    env.jwt.refreshSecret,
-    { expiresIn: env.jwt.refreshExpiresIn as any }
-  );
-};
-
-export const generateOTP = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-export const calculateDiscount = (subtotal: number, discountType: string, discountValue: number): number => {
-  if (discountType === 'PERCENTAGE') {
-    return (subtotal * discountValue) / 100;
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+  if (!hash) return false;
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch {
+    // A malformed stored hash must not crash the login route.
+    return false;
   }
-  return discountValue;
-};
+}
 
-export const calculateDiscountedPrice = (price: number, discountPercent: number): number => {
-  return price - (price * discountPercent) / 100;
-};
+/** Legacy alias kept for callers that imported the old helper name. */
+export const calculateDiscount = (subtotal: number, discountType: string, discountValue: number): number =>
+  fromCents(calculateDiscountCents(toCents(subtotal), discountType, discountValue));
 
-export const formatCurrency = (amount: number, currency: string = 'BDT'): string => {
-  return `${currency} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+/** Legacy alias for the old percentage-markdown helper. */
+export const calculateDiscountedPrice = (price: number, discountPercent: number): number =>
+  fromCents(applyPercentageDiscount(toCents(price), discountPercent));
 
-export const sanitizeUser = (user: any) => {
-  const { passwordHash, ...safeUser } = user;
-  return safeUser;
-};
+export interface PublicUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  [key: string]: unknown;
+}
 
-export const paginateResponse = (data: any[], total: number, page: number, limit: number) => {
-  return {
-    data,
-    pagination: {
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalItems: total,
-      itemsPerPage: limit,
-    },
-  };
-};
+/** Fields that must never leave the API boundary. */
+const SENSITIVE_USER_FIELDS = ['passwordHash', 'password', 'resetToken', 'otp'] as const;
+
+/**
+ * Strip credentials from a user record.
+ *
+ * Explicit deny-list plus an allow-list projection for the fields clients
+ * actually use, so a future column added to `User` cannot leak by accident.
+ */
+export function sanitizeUser<T extends Record<string, any>>(user: T): PublicUser {
+  const safe: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(user)) {
+    if ((SENSITIVE_USER_FIELDS as readonly string[]).includes(key)) continue;
+    safe[key] = value;
+  }
+  return safe as PublicUser;
+}
+
+/** Legacy pagination helper — kept for backwards compatibility. */
+export const paginateResponse = <T>(data: T[], total: number, page: number, limit: number) => ({
+  data,
+  pagination: buildPagination(total, page, limit),
+});
+
+/** Deterministic, case-insensitive comparison for search keys. */
+export function normalizeSearchTerm(term?: string | null): string | undefined {
+  if (!term) return undefined;
+  const trimmed = term.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}

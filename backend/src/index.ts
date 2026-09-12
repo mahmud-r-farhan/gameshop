@@ -1,74 +1,96 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { createServer } from 'http';
+import { createServer } from 'node:http';
+import { createApp } from './app.js';
 import { env } from './config/env.js';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { apiLimiter } from './middleware/rateLimiter.js';
-import routes from './routes/index.js';
-import { setupSocketIO } from './socket/socketHandlers.js';
 import prisma from './config/database.js';
+import { disconnectInfra, initInfra } from './config/redis.js';
+import { setupSocketIO } from './socket/socketHandlers.js';
 
-const app = express();
+/**
+ * Process bootstrap.
+ *
+ * Kept deliberately thin: `createApp()` in `app.ts` owns the Express wiring so it
+ * can be mounted by tests without any of the side effects below.
+ */
+
+const app = createApp({ rateLimit: true, serveUploads: true });
 const httpServer = createServer(app);
 
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: [env.frontend.url, env.frontend.adminUrl],
-  credentials: true,
-}));
+let shuttingDown = false;
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting
-app.use('/api/', apiLimiter);
-
-// API routes
-app.use('/api/v1', routes);
-
-// Static files for uploads
-app.use('/uploads', express.static('uploads'));
-
-// Error handling
-app.use(notFoundHandler);
-app.use(errorHandler);
-
-// Setup Socket.io
-const io = setupSocketIO(httpServer);
-app.set('io', io);
-
-// Database connection & server start
-async function start() {
+async function start(): Promise<void> {
   try {
+    await initInfra();
     await prisma.$connect();
     console.log('✅ Database connected');
 
-    httpServer.listen(env.port, () => {
-      console.log(`🚀 Server running on port ${env.port}`);
-      console.log(`📍 Environment: ${env.nodeEnv}`);
-      console.log(`🔗 Frontend URL: ${env.frontend.url}`);
-      console.log(`🔗 Admin URL: ${env.frontend.adminUrl}`);
+    const io = setupSocketIO(httpServer);
+    app.set('io', io);
+
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject);
+      httpServer.listen(env.port, '0.0.0.0', resolve);
     });
+
+    console.log(`🚀 Server running on port ${env.port}`);
+    console.log(`📍 Environment: ${env.nodeEnv}`);
+    console.log(`🔗 CORS origins: ${env.corsOrigins.join(', ') || '(same-origin only)'}`);
+    console.log(`❤️  Health: http://localhost:${env.port}/health`);
+    if (env.metrics.enabled) {
+      console.log(`📊 Metrics: http://localhost:${env.port}/api/v1/metrics`);
+    }
   } catch (error) {
     console.error('❌ Failed to start server:', error);
+    await shutdown(1);
+  }
+}
+
+/**
+ * Graceful shutdown.
+ *
+ * The previous handlers disconnected Prisma and called `process.exit`
+ * immediately, dropping in-flight requests on the floor and making rolling
+ * deploys visibly lossy. We now stop accepting connections, let the existing ones
+ * drain (bounded), then close the data connections.
+ */
+async function shutdown(exitCode: number, signal?: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  if (signal) console.log(`\n${signal} received — shutting down gracefully…`);
+
+  const forceExit = setTimeout(() => {
+    console.error('⏱  Graceful shutdown timed out, forcing exit');
+    process.exit(1);
+  }, 10_000);
+  forceExit.unref();
+
+  try {
+    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    await disconnectInfra();
+    await prisma.$disconnect();
+    console.log('👋 Shutdown complete');
+    process.exit(exitCode);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
 }
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+process.on('SIGINT', () => void shutdown(0, 'SIGINT'));
+process.on('SIGTERM', () => void shutdown(0, 'SIGTERM'));
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
 });
 
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+process.on('uncaughtException', (error) => {
+  // State after an uncaught exception is undefined — log and let the supervisor
+  // restart the process rather than limp along.
+  console.error('Uncaught exception:', error);
+  void shutdown(1, 'uncaughtException');
 });
 
-start();
+void start();
 
+export { app, httpServer };
 export default app;
