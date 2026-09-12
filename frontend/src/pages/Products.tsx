@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { productAPI } from '@/services/api';
 import { useCartStore } from '@/store/useCartStore';
 import {
-  ShoppingCart, Star, Search, SlidersHorizontal, Gamepad2,
+  ShoppingCart, Star, Search, Gamepad2,
   ChevronLeft, ChevronRight, X, Sparkles, Filter, ArrowUpDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -26,24 +26,24 @@ export const Products = () => {
   const gameType = searchParams.get('gameType') || 'ALL';
   const page = parseInt(searchParams.get('page') || '1');
   const sort = searchParams.get('sort') || 'newest';
+  const searchQuery = searchParams.get('search');
   const { addItem } = useCartStore();
 
-  useEffect(() => { loadProducts(); }, [category, gameType, page, sort, searchParams.get('search')]);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = { page, limit: 20, sort };
       if (category !== 'ALL') params.category = category;
       if (gameType !== 'ALL') params.gameType = gameType;
-      const s = searchParams.get('search');
-      if (s) params.search = s;
+      if (searchQuery) params.search = searchQuery;
       const res = await productAPI.list(params);
       setProducts(res.data.data.products);
       setPagination(res.data.data.pagination);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
-  };
+  }, [category, gameType, page, sort, searchQuery]);
+
+  useEffect(() => { loadProducts(); }, [loadProducts]);
 
   const updateParams = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams);
