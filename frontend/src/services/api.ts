@@ -30,6 +30,12 @@ api.interceptors.response.use(
 
 export default api;
 
+/** `/auth/verify-otp` response. The field is `resetToken`, not `token`. */
+export interface VerifyOtpResult {
+  resetToken: string;
+  expiresInSeconds: number;
+}
+
 // Auth API
 export const authAPI = {
   register: (data: { email: string; phone?: string; password: string; fullName: string }) =>
@@ -39,9 +45,9 @@ export const authAPI = {
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password', { email }),
   verifyOTP: (email: string, otp: string) =>
-    api.post('/auth/verify-otp', { email, otp }),
-  resetPassword: (email: string, password: string) =>
-    api.post('/auth/reset-password', { email, password }),
+    api.post<{ success: true; data: VerifyOtpResult }>('/auth/verify-otp', { email, otp }),
+  resetPassword: (email: string, password: string, token: string) =>
+    api.post('/auth/reset-password', { email, password, token }),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data: any) => api.patch('/auth/profile', data),
 };
