@@ -158,14 +158,14 @@ Access:
 
 ### Build contexts and lockfiles
 
-The frontend and admin images build from `./frontend` and `./admin`, so `npm ci`
-inside an image can only see that workspace's directory. Each of those folders
-therefore carries its own `package-lock.json`, generated from the root workspace
-lock (so both resolve the same versions). After changing dependencies, regenerate
-them from the repository root:
+The backend, frontend and admin images build from `./backend`, `./frontend` and
+`./admin`, so `npm ci` inside an image can only see that workspace's directory.
+Each of those folders therefore carries its own `package-lock.json`, generated
+from the root workspace lock (so all three resolve the same versions). After
+changing dependencies, regenerate them from the repository root:
 
 ```bash
-for workspace in frontend admin; do
+for workspace in backend frontend admin; do
   tmp="$(mktemp -d)"
   cp "$workspace/package.json" package-lock.json "$tmp/"
   (cd "$tmp" && npm install --package-lock-only --ignore-scripts)
@@ -173,7 +173,7 @@ for workspace in frontend admin; do
 done
 ```
 
-CI verifies that `npm ci` succeeds in both isolated build contexts.
+CI verifies that `npm ci` succeeds in all three isolated build contexts.
 
 ### Useful Docker Commands
 

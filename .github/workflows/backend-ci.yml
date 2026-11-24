@@ -78,3 +78,11 @@ jobs:
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: test_jwt_secret
           JWT_REFRESH_SECRET: test_refresh_secret
+
+      # The Docker build context is ./backend, so npm ci inside the image can
+      # only see this workspace's own lockfile. Fail here if it drifts.
+      - name: Verify the backend Docker build context installs cleanly
+        run: |
+          tmp="$(mktemp -d)"
+          cp backend/package.json backend/package-lock.json "$tmp/"
+          (cd "$tmp" && npm ci --ignore-scripts --no-audit --no-fund)
