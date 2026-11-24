@@ -14,7 +14,7 @@
     "dev:frontend": "npm run dev -w frontend",
     "dev:admin": "npm run dev -w admin",
     "build": "npm run build -w backend && npm run build -w frontend && npm run build -w admin",
-    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend && npm run lint -w admin",
     "test": "npm run test -w backend"
   },
   "devDependencies": {
