@@ -52,9 +52,9 @@ class ConfigErrorApp extends StatelessWidget {
                 children: [
                   const Icon(Icons.error_outline, size: 56, color: AppTheme.error),
                   const SizedBox(height: 20),
-                  const Semantics(
+                  Semantics(
                     header: true,
-                    child: Text(
+                    child: const Text(
                       'Mobile configuration error',
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                       textAlign: TextAlign.center,

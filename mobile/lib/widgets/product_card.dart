@@ -61,7 +61,7 @@ class ProductCard extends StatelessWidget {
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => const Center(
+                              placeholder: (_, _) => const Center(
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
@@ -69,7 +69,7 @@ class ProductCard extends StatelessWidget {
                                       strokeWidth: 2, color: AppTheme.neonCyan),
                                 ),
                               ),
-                              errorWidget: (_, __, ___) => const Icon(
+                              errorWidget: (_, _, _) => const Icon(
                                   Icons.videogame_asset,
                                   size: 40,
                                   color: Colors.white24),

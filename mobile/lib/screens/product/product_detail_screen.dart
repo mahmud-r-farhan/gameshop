@@ -59,7 +59,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ),
       body: Consumer<ProductProvider>(
-        builder: (_, pp, __) {
+        builder: (_, pp, _) {
           if (pp.loading) return const Center(child: CircularProgressIndicator(color: AppTheme.neonCyan));
 
           final product = pp.selectedProduct ?? (Get.arguments as ProductModel?);
@@ -129,8 +129,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ? CachedNetworkImage(
                                   imageUrl: product.displayImageUrl!,
                                   fit: BoxFit.cover,
-                                  placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan)),
-                                  errorWidget: (_, __, ___) => const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
+                                  placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan)),
+                                  errorWidget: (_, _, _) => const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
                                 )
                               : const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
                         ),

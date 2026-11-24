@@ -115,7 +115,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Order Details')),
       body: Consumer<OrderProvider>(
-        builder: (_, op, __) {
+        builder: (_, op, _) {
           final order = op.selectedOrder;
           if (op.loading && order == null) {
             return const Center(

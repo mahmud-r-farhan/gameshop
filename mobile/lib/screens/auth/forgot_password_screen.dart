@@ -47,9 +47,9 @@ class ForgotPasswordScreen extends StatelessWidget {
                         size: 48, color: AppTheme.neonAmber),
                   ),
                   const SizedBox(height: 24),
-                  const Semantics(
+                  Semantics(
                     header: true,
-                    child: Text(
+                    child: const Text(
                       'Reset Password',
                       style: TextStyle(
                           fontSize: 28,

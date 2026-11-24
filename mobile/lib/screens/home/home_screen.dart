@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Consumer<AuthProvider>(builder: (_, auth, __) => Row(
+                Consumer<AuthProvider>(builder: (_, auth, _) => Row(
                   children: [
                     Text('Welcome, ${auth.user?.fullName ?? 'Guest'}', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                     const Spacer(),
@@ -154,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _SectionHeader(title: 'Featured', action: 'See All', onAction: () => setState(() => _currentIndex = 1)),
           ),
           const SizedBox(height: 8),
-          Consumer<ProductProvider>(builder: (_, pp, __) {
+          Consumer<ProductProvider>(builder: (_, pp, _) {
             if (pp.featuredLoading && pp.featured.isEmpty) {
               return const SizedBox(
                 height: 240,

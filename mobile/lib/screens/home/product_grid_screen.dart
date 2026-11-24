@@ -71,7 +71,7 @@ class _ProductGridScreenState extends State<ProductGridScreen> {
           // Product Grid
           Expanded(
             child: Consumer<ProductProvider>(
-              builder: (_, pp, __) {
+              builder: (_, pp, _) {
                 if (pp.loading && pp.products.isEmpty) {
                   return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan));
                 }

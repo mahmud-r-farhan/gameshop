@@ -78,7 +78,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         ),
       ),
       body: Consumer<OrderProvider>(
-        builder: (_, op, __) {
+        builder: (_, op, _) {
           if (op.loading && op.orders.isEmpty) return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan));
           if (op.error != null && op.orders.isEmpty) {
             return Center(

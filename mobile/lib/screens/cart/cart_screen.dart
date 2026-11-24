@@ -16,7 +16,7 @@ class CartScreen extends StatelessWidget {
         title: const Text('Shopping Cart'),
         actions: [
           Consumer<CartProvider>(
-            builder: (_, cart, __) => cart.items.isEmpty
+            builder: (_, cart, _) => cart.items.isEmpty
                 ? const SizedBox()
                 : IconButton(
                     icon: const Icon(Icons.delete_sweep_outlined, color: AppTheme.error, size: 20),
@@ -35,7 +35,7 @@ class CartScreen extends StatelessWidget {
         ],
       ),
       body: Consumer<CartProvider>(
-        builder: (_, cart, __) {
+        builder: (_, cart, _) {
           if (cart.items.isEmpty) {
             return Center(
               child: Column(

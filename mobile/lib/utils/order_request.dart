@@ -55,16 +55,16 @@ Map<String, dynamic> buildCreateOrderRequest({
       throw const OrderRequestException('A cart item is missing its product ID');
     }
     if (quantity is! int || quantity <= 0 || quantity > maxQuantityPerItem) {
-      throw OrderRequestException('Quantity must be between 1 and $maxQuantityPerItem');
+      throw const OrderRequestException('Quantity must be between 1 and $maxQuantityPerItem');
     }
     final merged = (quantities[productId] ?? 0) + quantity;
     if (merged > maxQuantityPerItem) {
-      throw OrderRequestException('Quantity must be between 1 and $maxQuantityPerItem');
+      throw const OrderRequestException('Quantity must be between 1 and $maxQuantityPerItem');
     }
     quantities[productId] = merged;
   }
   if (quantities.length > maxItemsPerOrder) {
-    throw OrderRequestException('An order cannot contain more than $maxItemsPerOrder items');
+    throw const OrderRequestException('An order cannot contain more than $maxItemsPerOrder items');
   }
 
   final payload = <String, dynamic>{
@@ -80,14 +80,14 @@ Map<String, dynamic> buildCreateOrderRequest({
   final instructions = deliveryInstructions?.trim();
   if (instructions != null && instructions.isNotEmpty) {
     if (instructions.length > maxOrderInstructionsLength) {
-      throw OrderRequestException('Delivery instructions must be at most $maxOrderInstructionsLength characters');
+      throw const OrderRequestException('Delivery instructions must be at most $maxOrderInstructionsLength characters');
     }
     payload['deliveryInstructions'] = instructions;
   }
   final promo = promoCode?.trim();
   if (promo != null && promo.isNotEmpty) {
     if (promo.length < minPromoCodeLength || promo.length > maxPromoCodeLength) {
-      throw OrderRequestException('Promo code must be between $minPromoCodeLength and $maxPromoCodeLength characters');
+      throw const OrderRequestException('Promo code must be between $minPromoCodeLength and $maxPromoCodeLength characters');
     }
     payload['promoCode'] = promo.toUpperCase();
   }
