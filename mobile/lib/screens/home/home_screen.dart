@@ -155,12 +155,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Consumer<ProductProvider>(builder: (_, pp, __) {
-            if (pp.featured.isEmpty) {
+            if (pp.featuredLoading && pp.featured.isEmpty) {
+              return const SizedBox(
+                height: 240,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan)),
+              );
+            }
+            if (pp.featuredError != null && pp.featured.isEmpty) {
               return SizedBox(
                 height: 240,
-                child: Center(child: pp.loading
-                  ? const CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan)
-                  : const Text('No products yet', style: TextStyle(color: AppTheme.textSecondary))),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 40, color: AppTheme.error),
+                        const SizedBox(height: 8),
+                        Text(pp.featuredError!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () => pp.loadFeatured(),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+            if (pp.featured.isEmpty) {
+              return const SizedBox(
+                height: 240,
+                child: Center(child: Text('No featured products yet', style: TextStyle(color: AppTheme.textSecondary))),
               );
             }
             return SizedBox(

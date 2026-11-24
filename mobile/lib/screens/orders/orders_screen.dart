@@ -5,6 +5,7 @@ import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_provider.dart';
+import '../../utils/api_values.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -20,8 +21,13 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
-    _tabCtrl.addListener(() { if (!_tabCtrl.indexIsChanging) context.read<OrderProvider>().loadOrders(); });
-    WidgetsBinding.instance.addPostFrameCallback((_) => context.read<OrderProvider>().loadOrders());
+    // Filtering is local; re-fetching every order on each tab change was pure
+    // network churn. Rebuild the Consumer with the selected tab instead.
+    _tabCtrl.addListener(() {
+      if (!_tabCtrl.indexIsChanging && mounted) setState(() {});
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => context.read<OrderProvider>().loadOrders(refresh: true));
   }
 
   @override
@@ -74,6 +80,27 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       body: Consumer<OrderProvider>(
         builder: (_, op, __) {
           if (op.loading && op.orders.isEmpty) return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan));
+          if (op.error != null && op.orders.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 56, color: AppTheme.error),
+                    const SizedBox(height: 12),
+                    Text(op.error!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => op.loadOrders(refresh: true),
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           final filtered = _filter(_tabs[_tabCtrl.index]).isEmpty
               ? op.orders
               : op.orders.where((o) => _filter(_tabs[_tabCtrl.index]).split(',').contains(o.orderStatus.toLowerCase())).toList();
@@ -87,7 +114,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           }
           return RefreshIndicator(
             color: AppTheme.neonCyan,
-            onRefresh: () => op.loadOrders(),
+            onRefresh: () => op.loadOrders(refresh: true),
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: filtered.length,
@@ -124,7 +151,13 @@ class _OrderCard extends StatelessWidget {
         decoration: BoxDecoration(color: AppTheme.bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.borderColor)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Order #${order.id.substring(0, 8).toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppTheme.textPrimary)),
+            Expanded(
+              child: Text(
+                'Order #${order.orderNumber}',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppTheme.textPrimary),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: statusColor.withOpacity( 0.15), borderRadius: BorderRadius.circular(20)),
@@ -140,7 +173,7 @@ class _OrderCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(_formatDate(order.createdAt), style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)),
-            Text('BDT ${order.totalAmount.toStringAsFixed(0)}', style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w900, fontSize: 18)),
+            Text(formatBdt(order.totalAmount), style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w900, fontSize: 18)),
           ]),
           const SizedBox(height: 6),
           Row(children: [

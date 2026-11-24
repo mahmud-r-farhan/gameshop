@@ -1,3 +1,5 @@
+import '../utils/api_values.dart';
+
 class ProductModel {
   final String id;
   final String name;
@@ -15,11 +17,20 @@ class ProductModel {
   final List<ProductSpec> specs;
 
   ProductModel({
-    required this.id, required this.name, this.description,
-    required this.category, this.gameType, required this.price,
-    this.originalPrice, this.isAvailable = true, this.isFeatured = false,
-    this.thumbnailUrl, this.images = const [],
-    this.averageRating = 0, this.reviewCount = 0, this.specs = const [],
+    required this.id,
+    required this.name,
+    this.description,
+    required this.category,
+    this.gameType,
+    required this.price,
+    this.originalPrice,
+    this.isAvailable = true,
+    this.isFeatured = false,
+    this.thumbnailUrl,
+    this.images = const [],
+    this.averageRating = 0,
+    this.reviewCount = 0,
+    this.specs = const [],
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -29,22 +40,41 @@ class ProductModel {
       description: json['description'] as String?,
       category: json['category'] as String,
       gameType: json['gameType'] as String?,
-      price: (json['price'] as num).toDouble(),
-      originalPrice: (json['originalPrice'] as num?)?.toDouble(),
+      price: parseApiAmount(json['price'], field: 'price'),
+      originalPrice: parseOptionalApiAmount(json['originalPrice'], field: 'originalPrice'),
       isAvailable: json['isAvailable'] as bool? ?? true,
       isFeatured: json['isFeatured'] as bool? ?? false,
       thumbnailUrl: json['thumbnailUrl'] as String?,
-      images: (json['images'] as List?)?.cast<String>() ?? [],
-      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
-      reviewCount: (json['reviewCount'] as int?) ?? 0,
-      specs: (json['specs'] as List?)?.map((s) => ProductSpec.fromJson(s)).toList() ?? [],
+      images: (json['images'] as List?)
+              ?.map((url) => url.toString().trim())
+              .where((url) => url.isNotEmpty)
+              .toList() ??
+          [],
+      averageRating: parseApiAmount(json['averageRating'] ?? 0, field: 'averageRating'),
+      reviewCount: parseApiCount(json['reviewCount'], field: 'reviewCount', fallback: 0),
+      specs: (json['specs'] as List?)
+              ?.map((spec) => ProductSpec.fromJson(Map<String, dynamic>.from(spec as Map)))
+              .toList() ??
+          [],
     );
   }
 
-  String get formattedPrice => 'BDT ${price.toInt().toString()}';
+  String get formattedPrice => formatBdt(price);
+
+  /// Prefer the backend-provided thumbnail; fall back to the first image.
+  String? get displayImageUrl {
+    final thumbnail = thumbnailUrl?.trim();
+    if (thumbnail != null && thumbnail.isNotEmpty) return thumbnail;
+    for (final image in images) {
+      if (image.isNotEmpty) return image;
+    }
+    return null;
+  }
+
   String? get discountPercentage {
-    if (originalPrice == null || originalPrice == 0) return null;
-    final discount = ((originalPrice! - price) / originalPrice! * 100).round();
+    final original = originalPrice;
+    if (original == null || original <= 0 || original <= price) return null;
+    final discount = ((original - price) / original * 100).round();
     return '$discount%';
   }
 }
@@ -57,8 +87,8 @@ class ProductSpec {
   ProductSpec({required this.id, this.name, this.value});
 
   factory ProductSpec.fromJson(Map<String, dynamic> json) => ProductSpec(
-    id: json['id'] as String,
-    name: json['specName'] as String? ?? json['name'] as String?,
-    value: json['specValue'] as String? ?? json['value'] as String?,
-  );
+        id: json['id'] as String,
+        name: json['specName'] as String? ?? json['name'] as String?,
+        value: json['specValue'] as String? ?? json['value'] as String?,
+      );
 }

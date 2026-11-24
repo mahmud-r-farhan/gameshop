@@ -3,13 +3,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../config/constants.dart';
+import '../utils/api_values.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
+  final AuthService _authService;
   UserModel? _user;
   String? _token;
   bool _loading = false;
   String? _error;
+
+  AuthProvider({AuthService? authService})
+      : _authService = authService ?? AuthService();
 
   UserModel? get user => _user;
   String? get token => _token;
@@ -21,6 +25,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(AppConstants.tokenKey);
+    _error = null;
     notifyListeners();
   }
 
@@ -30,18 +35,22 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final data = await _authService.login(email, password);
-      _user = UserModel.fromJson(data['user']);
-      _token = data['accessToken'] as String;
+      final user = data['user'];
+      final token = data['accessToken'];
+      if (user is! Map || token is! String || token.isEmpty) {
+        throw const FormatException('Unexpected login response');
+      }
+      _user = UserModel.fromJson(Map<String, dynamic>.from(user));
+      _token = token;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.tokenKey, _token!);
-      _loading = false;
-      notifyListeners();
+      await prefs.setString(AppConstants.tokenKey, token);
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = apiErrorMessage(e, fallback: 'Could not sign in. Please try again.');
+      return false;
+    } finally {
       _loading = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -54,47 +63,62 @@ class AuthProvider extends ChangeNotifier {
         'email': email,
         'password': password,
         'fullName': fullName,
-        if (phone != null) 'phone': phone,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       });
-      _user = UserModel.fromJson(data['user']);
-      _token = data['accessToken'] as String;
+      final user = data['user'];
+      final token = data['accessToken'];
+      if (user is! Map || token is! String || token.isEmpty) {
+        throw const FormatException('Unexpected registration response');
+      }
+      _user = UserModel.fromJson(Map<String, dynamic>.from(user));
+      _token = token;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.tokenKey, _token!);
-      _loading = false;
-      notifyListeners();
+      await prefs.setString(AppConstants.tokenKey, token);
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = apiErrorMessage(e, fallback: 'Could not create your account. Please try again.');
+      return false;
+    } finally {
       _loading = false;
       notifyListeners();
-      return false;
     }
   }
 
   Future<void> logout() async {
     _user = null;
     _token = null;
+    _error = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.tokenKey);
     notifyListeners();
   }
 
-  Future<void> loadProfile() async {
+  /// Returns false and exposes a user-safe error instead of silently ignoring
+  /// profile failures (which previously left the profile screen stuck in its
+  /// "Not signed in" state while a token was still present).
+  Future<bool> loadProfile() async {
+    _error = null;
     try {
       final data = await _authService.getProfile();
       _user = UserModel.fromJson(data);
       notifyListeners();
-    } catch (_) {}
+      return true;
+    } catch (e) {
+      _error = apiErrorMessage(e, fallback: 'Could not load your profile. Please try again.');
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {
+    _error = null;
     try {
       final result = await _authService.updateProfile(data);
       _user = UserModel.fromJson(result);
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = apiErrorMessage(e, fallback: 'Could not update your profile. Please try again.');
       notifyListeners();
       return false;
     }

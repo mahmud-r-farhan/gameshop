@@ -1,3 +1,5 @@
+import '../utils/api_values.dart';
+
 class OrderModel {
   final String id;
   final String orderNumber;
@@ -18,22 +20,32 @@ class OrderModel {
   final UserBrief? user;
 
   OrderModel({
-    required this.id, required this.orderNumber,
-    required this.subtotal, this.discountAmount = 0, required this.totalAmount,
-    this.paymentStatus = 'PENDING', this.orderStatus = 'PENDING',
-    this.deliveryStatus = 'WAITING', required this.deliveryAddress,
-    this.deliveryInstructions, this.transactionId, this.paymentMethod,
-    this.promoCode, required this.createdAt, this.deliveredAt,
-    this.items = const [], this.user,
+    required this.id,
+    required this.orderNumber,
+    required this.subtotal,
+    this.discountAmount = 0,
+    required this.totalAmount,
+    this.paymentStatus = 'PENDING',
+    this.orderStatus = 'PENDING',
+    this.deliveryStatus = 'WAITING',
+    required this.deliveryAddress,
+    this.deliveryInstructions,
+    this.transactionId,
+    this.paymentMethod,
+    this.promoCode,
+    required this.createdAt,
+    this.deliveredAt,
+    this.items = const [],
+    this.user,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
       id: json['id'] as String,
       orderNumber: json['orderNumber'] as String,
-      subtotal: (json['subtotal'] as num).toDouble(),
-      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
-      totalAmount: (json['totalAmount'] as num).toDouble(),
+      subtotal: parseApiAmount(json['subtotal'], field: 'subtotal'),
+      discountAmount: parseApiAmount(json['discountAmount'] ?? 0, field: 'discountAmount'),
+      totalAmount: parseApiAmount(json['totalAmount'], field: 'totalAmount'),
       paymentStatus: json['paymentStatus'] as String? ?? 'PENDING',
       orderStatus: json['orderStatus'] as String? ?? 'PENDING',
       deliveryStatus: json['deliveryStatus'] as String? ?? 'WAITING',
@@ -43,9 +55,16 @@ class OrderModel {
       paymentMethod: json['paymentMethod'] as String?,
       promoCode: json['promoCode'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      deliveredAt: json['deliveredAt'] != null ? DateTime.parse(json['deliveredAt'] as String) : null,
-      items: (json['items'] as List?)?.map((i) => OrderItemModel.fromJson(i)).toList() ?? [],
-      user: json['user'] != null ? UserBrief.fromJson(json['user']) : null,
+      deliveredAt: json['deliveredAt'] != null
+          ? DateTime.parse(json['deliveredAt'] as String)
+          : null,
+      items: (json['items'] as List?)
+              ?.map((item) => OrderItemModel.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList() ??
+          [],
+      user: json['user'] != null
+          ? UserBrief.fromJson(Map<String, dynamic>.from(json['user'] as Map))
+          : null,
     );
   }
 }
@@ -57,16 +76,18 @@ class OrderItemModel {
   final double price;
 
   OrderItemModel({
-    required this.id, required this.productName,
-    required this.quantity, required this.price,
+    required this.id,
+    required this.productName,
+    required this.quantity,
+    required this.price,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) => OrderItemModel(
-    id: json['id'] as String,
-    productName: json['productName'] as String? ?? 'Product',
-    quantity: json['quantity'] as int? ?? 1,
-    price: (json['price'] as num).toDouble(),
-  );
+        id: json['id'] as String,
+        productName: json['productName'] as String? ?? 'Product',
+        quantity: parseApiCount(json['quantity'], field: 'quantity', fallback: 1),
+        price: parseApiAmount(json['price'], field: 'price'),
+      );
 
   double get total => price * quantity;
 }
@@ -80,9 +101,9 @@ class UserBrief {
   UserBrief({required this.id, required this.fullName, this.email, this.phone});
 
   factory UserBrief.fromJson(Map<String, dynamic> json) => UserBrief(
-    id: json['id'] as String,
-    fullName: json['fullName'] as String? ?? '',
-    email: json['email'] as String?,
-    phone: json['phone'] as String?,
-  );
+        id: json['id'] as String,
+        fullName: json['fullName'] as String? ?? '',
+        email: json['email'] as String?,
+        phone: json['phone'] as String?,
+      );
 }
