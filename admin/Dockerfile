@@ -2,7 +2,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files. The build context is ./admin, so this workspace carries
+# its own package-lock.json (generated from the root workspace lock); npm ci
+# cannot reach a lockfile outside the context.
 COPY package*.json ./
 COPY vite.config.ts ./
 COPY tsconfig.json ./

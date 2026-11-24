@@ -156,6 +156,25 @@ Access:
 - Backend API: http://localhost:5000
 - Health Check: http://localhost:5000/health
 
+### Build contexts and lockfiles
+
+The frontend and admin images build from `./frontend` and `./admin`, so `npm ci`
+inside an image can only see that workspace's directory. Each of those folders
+therefore carries its own `package-lock.json`, generated from the root workspace
+lock (so both resolve the same versions). After changing dependencies, regenerate
+them from the repository root:
+
+```bash
+for workspace in frontend admin; do
+  tmp="$(mktemp -d)"
+  cp "$workspace/package.json" package-lock.json "$tmp/"
+  (cd "$tmp" && npm install --package-lock-only --ignore-scripts)
+  cp "$tmp/package-lock.json" "$workspace/package-lock.json"
+done
+```
+
+CI verifies that `npm ci` succeeds in both isolated build contexts.
+
 ### Useful Docker Commands
 
 ```bash
