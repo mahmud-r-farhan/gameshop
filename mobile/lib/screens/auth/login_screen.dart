@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/validation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,11 +23,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    try {
-      await context.read<AuthProvider>().login(_emailCtrl.text.trim(), _passCtrl.text);
+    final auth = context.read<AuthProvider>();
+    final success = await auth.login(_emailCtrl.text.trim(), _passCtrl.text);
+    if (!mounted) return;
+    if (success) {
       Get.offNamed(AppRoutes.home);
-    } catch (e) {
-      Get.snackbar('Login Failed', e.toString().replaceAll('Exception: ', ''), backgroundColor: AppTheme.error.withOpacity(0.9), colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+    } else {
+      // AuthProvider.login returns false (rather than throwing) on API errors.
+      // Navigating unconditionally previously sent failed sign-ins to Home.
+      Get.snackbar(
+        'Login Failed',
+        auth.error ?? 'Could not sign in. Please try again.',
+        backgroundColor: AppTheme.error.withOpacity(0.9),
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -67,9 +78,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined, color: AppTheme.neonCyan, size: 20)),
-                      validator: (v) => v!.isEmpty ? 'Email is required' : null,
+                      validator: emailProblem,
                     ),
                     const SizedBox(height: 16),
 
@@ -77,9 +90,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passCtrl,
                       obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outlined, color: AppTheme.neonCyan, size: 20)),
-                      validator: (v) => v!.isEmpty ? 'Password is required' : null,
+                      validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
                       onFieldSubmitted: (_) => _login(),
                     ),
                     const SizedBox(height: 8),

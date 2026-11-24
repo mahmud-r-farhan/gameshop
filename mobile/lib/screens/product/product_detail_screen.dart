@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import '../../config/routes.dart';
 import '../../models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
+import '../../utils/api_values.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String? productId;
@@ -57,7 +59,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ),
       body: Consumer<ProductProvider>(
-        builder: (_, pp, __) {
+        builder: (_, pp, _) {
           if (pp.loading) return const Center(child: CircularProgressIndicator(color: AppTheme.neonCyan));
 
           final product = pp.selectedProduct ?? (Get.arguments as ProductModel?);
@@ -123,11 +125,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         borderRadius: BorderRadius.circular(20),
                         child: SizedBox(
                           width: 200, height: 220,
-                          child: product.thumbnailUrl != null
-                              ? Image.network(
-                                  product.thumbnailUrl!,
+                          child: product.displayImageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: product.displayImageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
+                                  placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan)),
+                                  errorWidget: (_, _, _) => const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
                                 )
                               : const Icon(Icons.sports_esports, size: 80, color: Colors.white54),
                         ),
@@ -189,7 +192,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Text(
-                                  'BDT ${product.originalPrice!.toInt()}',
+                                  formatBdt(product.originalPrice!),
                                   style: const TextStyle(
                                     fontSize: 18,
                                     color: AppTheme.textSecondary,

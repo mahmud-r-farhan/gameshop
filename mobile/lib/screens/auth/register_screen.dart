@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/validation.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -27,17 +28,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
-    try {
-      await context.read<AuthProvider>().register(
-        _emailCtrl.text.trim(),
-        _passCtrl.text,
-        _nameCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      );
+    final auth = context.read<AuthProvider>();
+    final success = await auth.register(
+      _emailCtrl.text.trim(),
+      _passCtrl.text,
+      _nameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+    );
+    if (!mounted) return;
+    if (success) {
       Get.offNamed(AppRoutes.home);
-    } catch (e) {
-      Get.snackbar('Registration Failed', e.toString().replaceAll('Exception: ', ''),
-          backgroundColor: AppTheme.error.withOpacity( 0.9), colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+    } else {
+      Get.snackbar('Registration Failed', auth.error ?? 'Could not create your account.',
+          backgroundColor: AppTheme.error.withOpacity(0.9), colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
     }
   }
 
@@ -75,32 +78,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     TextFormField(
                       controller: _nameCtrl,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline, color: AppTheme.neonCyan, size: 20)),
-                      validator: (v) => v!.isEmpty ? 'Name is required' : null,
+                      validator: fullNameProblem,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
                       style: const TextStyle(color: AppTheme.textPrimary),
                       decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined, color: AppTheme.neonCyan, size: 20)),
-                      validator: (v) => v!.isEmpty ? 'Email is required' : null,
+                      validator: emailProblem,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _phoneCtrl,
                       keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.telephoneNumber],
                       style: const TextStyle(color: AppTheme.textPrimary),
-                      decoration: const InputDecoration(labelText: 'Phone', prefixIcon: Icon(Icons.phone_outlined, color: AppTheme.neonCyan, size: 20)),
+                      decoration: const InputDecoration(labelText: 'Phone (optional)', prefixIcon: Icon(Icons.phone_outlined, color: AppTheme.neonCyan, size: 20)),
+                      validator: optionalPhoneProblem,
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _passCtrl,
                       obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
                       style: const TextStyle(color: AppTheme.textPrimary),
-                      decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outlined, color: AppTheme.neonCyan, size: 20)),
-                      validator: (v) => v!.length < 6 ? 'Min 6 characters' : null,
+                      decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outlined, color: AppTheme.neonCyan, size: 20), helperText: 'At least 8 characters, with a letter and a number'),
+                      validator: passwordProblem,
+                      onFieldSubmitted: (_) => _register(),
                     ),
                     const SizedBox(height: 24),
 

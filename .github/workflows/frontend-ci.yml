@@ -33,8 +33,19 @@ jobs:
       - name: Run linter
         run: cd frontend && npm run lint
 
+      - name: Run tests
+        run: cd frontend && npm test
+
       - name: Build
         run: cd frontend && npm run build
+
+      # The Docker build context is ./frontend, so npm ci inside the image can
+      # only see this workspace's own lockfile. Fail here if it drifts.
+      - name: Verify the frontend Docker build context installs cleanly
+        run: |
+          tmp="$(mktemp -d)"
+          cp frontend/package.json frontend/package-lock.json "$tmp/"
+          (cd "$tmp" && npm ci --ignore-scripts --no-audit --no-fund)
 
   admin:
     name: Admin Panel (Vue 3)
@@ -59,3 +70,11 @@ jobs:
 
       - name: Build
         run: cd admin && npm run build
+
+      # The Docker build context is ./admin, so npm ci inside the image can
+      # only see this workspace's own lockfile. Fail here if it drifts.
+      - name: Verify the admin Docker build context installs cleanly
+        run: |
+          tmp="$(mktemp -d)"
+          cp admin/package.json admin/package-lock.json "$tmp/"
+          (cd "$tmp" && npm ci --ignore-scripts --no-audit --no-fund)

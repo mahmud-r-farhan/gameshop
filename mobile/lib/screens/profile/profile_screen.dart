@@ -14,13 +14,25 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('My Profile')),
       body: auth.user == null
-          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.bgCard, border: Border.all(color: AppTheme.borderColor)),
-                child: const Icon(Icons.person_outline, size: 48, color: AppTheme.textMuted)),
-              const SizedBox(height: 16), const Text('Not signed in', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(onPressed: () => Get.offNamed(AppRoutes.login), icon: const Icon(Icons.login, size: 18), label: const Text('Sign In')),
-            ]))
+          ? Center(child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.bgCard, border: Border.all(color: AppTheme.borderColor)),
+                  child: const Icon(Icons.person_outline, size: 48, color: AppTheme.textMuted)),
+                const SizedBox(height: 16),
+                Text(auth.error == null ? 'Not signed in' : 'Profile unavailable',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                if (auth.error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(auth.error!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+                ],
+                const SizedBox(height: 24),
+                if (auth.error != null)
+                  ElevatedButton.icon(onPressed: () => auth.loadProfile(), icon: const Icon(Icons.refresh, size: 18), label: const Text('Retry'))
+                else
+                  ElevatedButton.icon(onPressed: () => Get.offNamed(AppRoutes.login), icon: const Icon(Icons.login, size: 18), label: const Text('Sign In')),
+              ]),
+            ))
           : ListView(padding: const EdgeInsets.all(16), children: [
               // Profile header
               Container(

@@ -33,13 +33,13 @@
 - **User Authentication** — Register, login, forgot password with OTP verification
 - **Shopping Cart** — Add/remove items, adjust quantities, persistent storage
 - **Checkout & Payment** — Multiple payment methods (bKash, Nagad, Rocket), transaction ID submission
-- **Order Tracking** — Real-time order status updates with timeline view
+- **Order Tracking** — Order status, payment state and delivery state on the order detail page
 - **Product Reviews** — Rate and review purchased products
 - **User Profile** — Edit profile, view order history, manage settings
 - **Responsive Design** — Optimized for desktop, tablet, and mobile
 
 ### 🔧 Admin Features
-- **Dashboard** — Real-time analytics with revenue charts, order stats, and KPIs
+- **Dashboard** — Analytics with revenue charts, order stats, and KPIs
 - **Product Management** — CRUD operations, featured products, availability control
 - **Order Management** — View, filter, update order status (verify payment, deliver, cancel)
 - **Payment Verification** — Manual payment verification with transaction tracking
@@ -51,9 +51,11 @@
 ### 📱 Mobile Features
 - **Cross-Platform** — iOS and Android from a single Flutter codebase
 - **Native Performance** — Smooth animations and fast load times
-- **Biometric Auth** — Fingerprint and face ID support
-- **Push Notifications** — Real-time order updates
-- **Offline Support** — Cart persistence, cached product listings
+- **Local Cart** — Cart persists on the device between sessions
+
+> Not implemented yet: biometric auth, push notifications, offline product
+> caching, and realtime order updates in the clients. The server emits order
+> events, but no web or mobile client subscribes to them today.
 
 ---
 
@@ -100,9 +102,9 @@
 | **TypeScript** | Type safety |
 | **Prisma ORM** | Database modeling and migrations |
 | **PostgreSQL 15** | Primary database |
-| **Redis 7** | Caching and session store |
+| **Redis 7** | Optional OTP store (in-memory fallback); sessions are stateless JWTs |
 | **JWT** | Authentication tokens |
-| **Socket.io** | Real-time communication |
+| **Socket.io** | Server-side order and admin events (clients not wired up yet) |
 | **Zod** | Input validation |
 | **Helmet** | Security headers |
 
@@ -113,8 +115,7 @@
 | **Docker Compose** | Multi-service orchestration |
 | **Nginx** | Reverse proxy and static serving |
 | **GitHub Actions** | CI/CD pipeline |
-| **Prometheus** | Metrics collection |
-| **Grafana** | Monitoring dashboards |
+| **Prometheus / Grafana** | Planned — not configured in either compose file |
 
 ---
 
@@ -125,12 +126,10 @@ gameshop/
 ├── backend/          # Node.js + Express REST API
 │   ├── src/
 │   │   ├── config/       # Database, Redis, env config
-│   │   ├── controllers/  # Route handlers
 │   │   ├── middleware/    # Auth, rate limiting, validation
 │   │   ├── routes/       # API route definitions
 │   │   ├── services/     # Business logic layer
 │   │   ├── socket/       # WebSocket handlers
-│   │   ├── events/       # Event publishers
 │   │   └── utils/        # Helpers and utilities
 │   ├── prisma/           # Schema and migrations
 │   └── tests/            # Unit and integration tests
@@ -139,11 +138,9 @@ gameshop/
 │   ├── src/
 │   │   ├── components/  # Reusable UI components
 │   │   ├── pages/       # Page-level components
-│   │   ├── hooks/       # Custom React hooks
 │   │   ├── services/    # API service layer
 │   │   ├── store/       # Zustand state stores
 │   │   └── lib/         # Utilities and helpers
-│   └── public/          # Static assets
 │
 ├── admin/            # Vue 3 admin dashboard
 │   ├── src/
@@ -153,7 +150,6 @@ gameshop/
 │   │   ├── router/      # Route definitions
 │   │   ├── store/       # Pinia state stores
 │   │   └── services/    # API integration
-│   └── public/
 │
 ├── mobile/           # Flutter mobile app
 │   ├── lib/
@@ -165,10 +161,9 @@ gameshop/
 │   │   └── config/      # Theme and routing
 │   └── android/ & ios/  # Platform-specific code
 │
-├── nginx/            # Nginx production config
-├── .github/          # CI/CD workflows
+├── nginx/            # Nginx production config template
 ├── docs/             # Project documentation
-└── scripts/          # Utility scripts
+└── .github/          # CI/CD workflows
 ```
 
 ---
@@ -187,26 +182,20 @@ gameshop/
 ```bash
 git clone https://github.com/mahmud-r-farhan/gameshop.git
 cd gameshop
-
-# Backend
-cd backend && npm install && cd ..
-
-# Frontend
-cd frontend && npm install && cd ..
-
-# Admin Panel
-cd admin && npm install && cd ..
+npm ci                 # installs all npm workspaces from the root lockfile
 ```
 
 ### 2. Environment Setup
 
 ```bash
-# Copy environment files
 cp .env.example .env
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# Edit the .env files with your configuration
+# Edit both files with your configuration
 ```
+
+The web apps need no env file for local development: the Vite dev server proxies
+`/api` and `/socket.io` to `http://localhost:5000`, and the API client defaults
+to the same-origin `/api/v1` path.
 
 ### 3. Database Setup
 

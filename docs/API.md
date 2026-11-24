@@ -4,6 +4,10 @@ Base URL: `/api/v1`
 
 ## Authentication
 
+Request bodies use strict Zod schemas: unknown keys are rejected with `400`.
+Passwords must be 8–128 characters and contain at least one letter and one
+digit. Phone numbers are Bangladeshi (`+8801XXXXXXXXX` or `01XXXXXXXXX`).
+
 ### Register
 ```http
 POST /api/v1/auth/register
@@ -11,16 +15,19 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "password": "SecurePass123!",
-  "name": "John Doe",
-  "phone": "+8801234567890"
+  "password": "SecurePass1",
+  "fullName": "John Doe",
+  "phone": "+8801712345678"
 }
+```
+The field is `fullName`, not `name`. `phone` is optional.
 
-Response: 201
+Response: `201`
+```json
 {
   "success": true,
   "message": "Registration successful",
-  "data": { "id": "uuid", "email": "user@example.com" }
+  "data": { "user": { "id": "uuid", "email": "user@example.com", "fullName": "John Doe", "role": "USER" }, "accessToken": "jwt", "refreshToken": "jwt" }
 }
 ```
 
@@ -29,20 +36,33 @@ Response: 201
 POST /api/v1/auth/login
 Content-Type: application/json
 
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!"
-}
+{ "email": "user@example.com", "password": "SecurePass1" }
+```
 
-Response: 200
+Response: `200`
+```json
 {
   "success": true,
   "data": {
-    "token": "jwt_token",
-    "user": { "id": "uuid", "email": "user@example.com", "name": "John Doe", "role": "USER" }
+    "user": { "id": "uuid", "email": "user@example.com", "fullName": "John Doe", "role": "USER" },
+    "accessToken": "jwt",
+    "refreshToken": "jwt"
   }
 }
 ```
+
+### Refresh / Logout
+```http
+POST /api/v1/auth/refresh
+{ "refreshToken": "jwt" }
+```
+Returns a rotated `{ user, accessToken, refreshToken }` pair.
+
+```http
+POST /api/v1/auth/logout
+```
+Stateless (JWT); clients clear their own tokens. Response:
+`{ "success": true, "message": "Logged out" }`.
 
 ### Forgot Password
 ```http
@@ -50,10 +70,24 @@ POST /api/v1/auth/forgot-password
 Content-Type: application/json
 
 { "email": "user@example.com" }
-
-Response: 200
-{ "success": true, "message": "OTP sent to your email" }
 ```
+Response: `200`
+`{ "success": true, "message": "If the email exists, an OTP has been sent" }`
+— identical whether or not the address is registered.
+
+### Verify OTP
+```http
+POST /api/v1/auth/verify-otp
+Content-Type: application/json
+
+{ "email": "user@example.com", "otp": "123456" }
+```
+Response: `200`
+```json
+{ "success": true, "data": { "resetToken": "jwt", "expiresInSeconds": 900 } }
+```
+The token is signed with the refresh secret, has `type: password_reset`, is bound
+to the account's current password hash, and expires in 15 minutes.
 
 ### Reset Password
 ```http
@@ -62,27 +96,27 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "otp": "123456",
-  "password": "NewSecurePass123!"
+  "password": "NewSecurePass1",
+  "token": "<resetToken from /auth/verify-otp>"
 }
-
-Response: 200
-{ "success": true, "message": "Password reset successful" }
 ```
+`token` is required (minimum 20 characters). `otp` is **not** accepted here.
+Response: `200` `{ "success": true, "message": "Password reset successful" }`.
 
 ### Get Profile
 ```http
 GET /api/v1/auth/profile
-Authorization: Bearer <token>
-
-Response: 200
+Authorization: Bearer <accessToken>
+```
+Response: `200`
+```json
 {
   "success": true,
   "data": {
     "id": "uuid",
     "email": "user@example.com",
-    "name": "John Doe",
-    "phone": "+8801234567890",
+    "fullName": "John Doe",
+    "phone": "+8801712345678",
     "role": "USER"
   }
 }
@@ -90,17 +124,23 @@ Response: 200
 
 ### Update Profile
 ```http
-PUT /api/v1/auth/profile
-Authorization: Bearer <token>
+PATCH /api/v1/auth/profile
+Authorization: Bearer <accessToken>
 Content-Type: application/json
 
-{
-  "name": "John Updated",
-  "phone": "+8809876543210"
-}
+{ "fullName": "John Updated", "phone": "+8801876543210" }
+```
+Allow-listed fields only: `fullName`, `phone`, `avatarUrl`, `division`,
+`district`, `address`, `postalCode`, `preferredPaymentMethod`,
+`notificationPreferences`. `role`, `isActive` and other unknown keys are
+rejected. Response: `200` `{ "success": true, "data": { ...updated user } }`.
 
-Response: 200
-{ "success": true, "data": { ...updated user } }
+### Change Password
+```http
+POST /api/v1/auth/change-password
+Authorization: Bearer <accessToken>
+
+{ "currentPassword": "SecurePass1", "newPassword": "AnotherPass2" }
 ```
 
 ## Products
@@ -425,6 +465,35 @@ Content-Type: application/json
 ```http
 PATCH /api/v1/admin/payment-gateways/:id/toggle
 ```
+
+## Realtime (Socket.io)
+
+Connect to the API origin with an access token in the handshake:
+`io('/', { auth: { token: accessToken } })`. Refresh, reset and invalid tokens are
+rejected at connection time.
+
+### Subscribe to an order
+
+```js
+socket.emit('order:subscribe', orderId, (ack) => {
+  // ack: { ok: true } | { ok: false }
+});
+```
+
+The server looks up the order and joins the caller to `order:<id>` only when the
+caller owns it, or has the `ADMIN` / `SUPER_ADMIN` role. A malformed ID, an ID
+that does not exist, and another customer's ID all produce the same
+`{ ok: false }` ack, so subscriptions cannot be used to enumerate orders.
+`socket.emit('order:unsubscribe', orderId)` leaves the room.
+
+| Event | Room | Payload |
+|---|---|---|
+| `order_update` | `user:<userId>` and `order:<id>` | `{ type: 'ORDER_UPDATE', data: order, timestamp }` |
+| `payment_verified` | `user:<userId>` and `order:<id>` | `{ type: 'PAYMENT_VERIFIED', orderId, message, timestamp }` |
+| `new_order` | admin room only | `{ type: 'NEW_ORDER', orderId, orderNumber, totalAmount, userId, timestamp }` |
+
+Clients without an ack callback are still subject to the same authorization
+check. The ack is optional only for backwards compatibility.
 
 ## Error Responses
 

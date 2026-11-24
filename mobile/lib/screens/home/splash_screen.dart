@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -32,8 +35,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
+    // Hydrate the providers that the screens actually use. Previously the
+    // splash read the token but never populated AuthProvider/CartProvider,
+    // so a signed-in user saw "Not signed in" and an empty cart.
+    final auth = context.read<AuthProvider>();
+    final cart = context.read<CartProvider>();
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AppConstants.tokenKey);
+    var token = prefs.getString(AppConstants.tokenKey);
+    if (token != null && token.isNotEmpty) {
+      await auth.loadToken();
+      final profileLoaded = await auth.loadProfile();
+      await cart.loadCart();
+      if (!mounted) return;
+      // A 401 clears the stored token in ApiService. Re-read it so an expired
+      // session cannot leave the app on an authenticated route.
+      token = prefs.getString(AppConstants.tokenKey);
+      if (!profileLoaded && (token == null || token.isEmpty)) {
+        await auth.loadToken();
+      }
+    }
+    if (!mounted) return;
     Get.offNamed(token != null && token.isNotEmpty ? AppRoutes.home : AppRoutes.login);
   }
 

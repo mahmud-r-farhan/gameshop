@@ -2,33 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../config/theme.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+/// Mobile password reset is intentionally not faked.
+///
+/// The old screen reported "OTP Sent" without contacting the backend and had
+/// no OTP verification or signed reset-token step. A real reset flow touches
+/// password handling and needs explicit maintainer approval; until then this
+/// screen gives an honest, non-misleading instruction instead of a dead end.
+class ForgotPasswordScreen extends StatelessWidget {
   const ForgotPasswordScreen({super.key});
-
-  @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
-}
-
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _emailCtrl = TextEditingController();
-  bool _sent = false;
-
-  @override
-  void dispose() { _emailCtrl.dispose(); super.dispose(); }
-
-  void _sendOtp() {
-    if (_emailCtrl.text.trim().isEmpty) return;
-    setState(() => _sent = true);
-    Get.snackbar('OTP Sent', 'Check your email for the OTP',
-        backgroundColor: AppTheme.neonCyan.withOpacity(0.9), colorText: AppTheme.bgDark, snackPosition: SnackPosition.BOTTOM);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [AppTheme.bgDark, AppTheme.bgSurface]),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppTheme.bgDark, AppTheme.bgSurface],
+          ),
         ),
         child: SafeArea(
           child: Center(
@@ -41,39 +33,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.bgCard,        border: Border.all(color: AppTheme.neonAmber.withOpacity(0.3)),
-        boxShadow: [BoxShadow(color: AppTheme.neonAmber.withOpacity(0.1), blurRadius: 30)],
+                      color: AppTheme.bgCard,
+                      border: Border.all(
+                          color: AppTheme.neonAmber.withOpacity(0.3)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.neonAmber.withOpacity(0.1),
+                          blurRadius: 30,
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.lock_reset, size: 48, color: AppTheme.neonAmber),
+                    child: const Icon(Icons.lock_reset,
+                        size: 48, color: AppTheme.neonAmber),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Reset Password', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
-                  const SizedBox(height: 8),
-                  Text('Enter your email to receive an OTP', style: TextStyle(color: AppTheme.textSecondary.withOpacity(0.7))),
+                  Semantics(
+                    header: true,
+                    child: const Text(
+                      'Reset Password',
+                      style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.textPrimary),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Password reset is available on the GameShop website. '
+                    'Please use the website’s Forgot Password flow, then sign in here with your new password.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: AppTheme.textSecondary.withOpacity(0.85),
+                        fontSize: 15,
+                        height: 1.4),
+                  ),
                   const SizedBox(height: 32),
-
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: AppTheme.textPrimary),
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined, color: AppTheme.neonCyan, size: 20),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
                   SizedBox(
-                    width: double.infinity, height: 52,
-                    child: ElevatedButton(
-                      onPressed: _sendOtp,
-                      child: Text(_sent ? 'Resend OTP' : 'Send OTP', style: const TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: double.infinity, height: 52,
+                    width: double.infinity,
+                    height: 52,
                     child: OutlinedButton(
                       onPressed: () => Get.back(),
                       child: const Text('Back to Login'),

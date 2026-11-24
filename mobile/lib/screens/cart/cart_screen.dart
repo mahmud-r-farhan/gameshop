@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../providers/cart_provider.dart';
+import '../../utils/api_values.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -15,7 +16,7 @@ class CartScreen extends StatelessWidget {
         title: const Text('Shopping Cart'),
         actions: [
           Consumer<CartProvider>(
-            builder: (_, cart, __) => cart.items.isEmpty
+            builder: (_, cart, _) => cart.items.isEmpty
                 ? const SizedBox()
                 : IconButton(
                     icon: const Icon(Icons.delete_sweep_outlined, color: AppTheme.error, size: 20),
@@ -34,7 +35,7 @@ class CartScreen extends StatelessWidget {
         ],
       ),
       body: Consumer<CartProvider>(
-        builder: (_, cart, __) {
+        builder: (_, cart, _) {
           if (cart.items.isEmpty) {
             return Center(
               child: Column(
@@ -65,6 +66,26 @@ class CartScreen extends StatelessWidget {
           }
           return Column(
             children: [
+              if (cart.error != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  color: AppTheme.error.withOpacity(0.1),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppTheme.error, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(cart.error!,
+                            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
+                      ),
+                      TextButton(
+                        onPressed: cart.clearError,
+                        child: const Text('Dismiss'),
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -96,7 +117,7 @@ class CartScreen extends StatelessWidget {
                               children: [
                                 Text(item.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
                                 const SizedBox(height: 4),
-                                Text('BDT ${item.price.toStringAsFixed(0)}', style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w800, fontSize: 16)),
+                                Text(formatBdt(item.price), style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w800, fontSize: 16)),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -155,9 +176,9 @@ class CartScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Total', style: TextStyle(color: AppTheme.textSecondary.withOpacity( 0.7), fontSize: 12)),
+                            Text('Estimated total', style: TextStyle(color: AppTheme.textSecondary.withOpacity(0.7), fontSize: 12)),
                             const SizedBox(height: 2),
-                            Text('BDT ${cart.totalPrice.toStringAsFixed(0)}', style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w900, fontSize: 24)),
+                            Text(formatBdt(cart.totalPrice), style: const TextStyle(color: AppTheme.neonCyan, fontWeight: FontWeight.w900, fontSize: 24)),
                           ],
                         ),
                       ),

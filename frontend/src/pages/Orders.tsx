@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,31 +7,65 @@ import { orderAPI } from '@/services/api';
 import { Package, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+interface OrderListItem {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  totalAmount: string | number;
+  orderStatus: string;
+  paymentStatus: string;
+  items?: { id: string }[];
+}
+
+interface OrdersPage {
+  orders: OrderListItem[];
+}
+
+type BadgeVariant = 'warning' | 'info' | 'success' | 'destructive' | 'secondary';
+
+const statusVariant = (status: string): BadgeVariant => {
+  switch (status) {
+    case 'PENDING': return 'warning';
+    case 'PROCESSING': return 'info';
+    case 'DELIVERED': return 'success';
+    case 'CANCELLED': return 'destructive';
+    default: return 'secondary';
+  }
+};
+
 export const Orders = () => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isPending, isError, refetch } = useQuery<OrdersPage>({
+    queryKey: ['orders'],
+    queryFn: () => orderAPI.getMyOrders().then((res) => res.data.data),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => { loadOrders(); }, []);
+  if (isPending) {
+    return (
+      <div className="container mx-auto max-w-3xl px-4 py-8" aria-busy="true" aria-label="Loading orders">
+        <div className="mb-8 h-9 w-48 animate-pulse rounded bg-muted" />
+        <div className="space-y-4">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="h-32 animate-pulse rounded-lg bg-muted" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-  const loadOrders = async () => {
-    try {
-      const res = await orderAPI.getMyOrders();
-      setOrders(res.data.data.orders);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
+  if (isError) {
+    return (
+      <div className="container mx-auto max-w-3xl px-4 py-8">
+        <h1 className="mb-8 text-3xl font-bold">My Orders</h1>
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border p-6 text-sm">
+          <span>We couldn't load your orders.</span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Try again</Button>
+        </div>
+      </div>
+    );
+  }
 
-  const statusColor = (status: string) => {
-    switch(status) {
-      case 'PENDING': return 'warning';
-      case 'PROCESSING': return 'info';
-      case 'DELIVERED': return 'success';
-      case 'CANCELLED': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  if (loading) return <div className="container px-4 py-20 text-center"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" /></div>;
+  const orders = data?.orders ?? [];
 
   return (
     <div className="container px-4 py-8 max-w-3xl mx-auto">
@@ -45,7 +79,7 @@ export const Orders = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order: any, idx: number) => (
+          {orders.map((order, idx) => (
             <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
               <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -54,16 +88,18 @@ export const Orders = () => {
                       <p className="text-sm text-muted-foreground">Order #{order.orderNumber}</p>
                       <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <Badge variant={statusColor(order.orderStatus) as any}>{order.orderStatus}</Badge>
+                    <Badge variant={statusVariant(order.orderStatus)}>{order.orderStatus}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold">BDT {Number(order.totalAmount).toLocaleString()}</p>
+                      <p className="font-semibold">BDT {Number(order.totalAmount).toLocaleString('en-BD')}</p>
                       <p className="text-xs text-muted-foreground">{order.items?.length || 0} items</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant={order.paymentStatus === 'VERIFIED' ? 'success' : 'warning'}>{order.paymentStatus}</Badge>
-                      <Link to={`/orders/${order.id}`}><Button variant="ghost" size="sm"><ChevronRight className="h-4 w-4" /></Button></Link>
+                      <Link to={`/orders/${order.id}`} aria-label={`View order ${order.orderNumber}`}>
+                        <Button variant="ghost" size="sm"><ChevronRight className="h-4 w-4" /></Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>

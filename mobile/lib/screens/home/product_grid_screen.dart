@@ -71,9 +71,30 @@ class _ProductGridScreenState extends State<ProductGridScreen> {
           // Product Grid
           Expanded(
             child: Consumer<ProductProvider>(
-              builder: (_, pp, __) {
+              builder: (_, pp, _) {
                 if (pp.loading && pp.products.isEmpty) {
                   return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.neonCyan));
+                }
+                if (pp.error != null && pp.products.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, size: 56, color: AppTheme.error),
+                          const SizedBox(height: 12),
+                          Text(pp.error!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => pp.loadProducts(refresh: true),
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
                 if (pp.products.isEmpty) {
                   return Center(

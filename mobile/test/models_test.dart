@@ -169,4 +169,88 @@ void main() {
       expect(review.helpfulCount, 10);
     });
   });
+
+  group('Prisma Decimal and API compatibility', () {
+    test('ProductModel accepts decimal strings from Prisma', () {
+      final product = ProductModel.fromJson({
+        'id': 'prod-3',
+        'name': 'Fractional Product',
+        'category': 'GAME',
+        'price': '1000.50',
+        'originalPrice': '1200.75',
+        'averageRating': '4.8',
+        'reviewCount': '25',
+        'images': ['', 'https://example.com/fallback.jpg'],
+      });
+
+      expect(product.price, 1000.50);
+      expect(product.originalPrice, 1200.75);
+      expect(product.formattedPrice, 'BDT 1000.50');
+      expect(product.averageRating, 4.8);
+      expect(product.reviewCount, 25);
+      expect(product.displayImageUrl, 'https://example.com/fallback.jpg');
+    });
+
+    test('ProductModel prefers a thumbnail over the image list', () {
+      final product = ProductModel.fromJson({
+        'id': 'prod-4',
+        'name': 'Thumb Product',
+        'category': 'GAME',
+        'price': 500,
+        'thumbnailUrl': 'https://example.com/thumb.jpg',
+        'images': ['https://example.com/full.jpg'],
+      });
+      expect(product.displayImageUrl, 'https://example.com/thumb.jpg');
+    });
+
+    test('invalid numeric strings fail loudly instead of producing NaN', () {
+      expect(
+        () => ProductModel.fromJson({
+          'id': 'prod-5',
+          'name': 'Broken Product',
+          'category': 'GAME',
+          'price': 'not-a-price',
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('OrderModel parses decimal strings and string counts', () {
+      final order = OrderModel.fromJson({
+        'id': 'ord-2',
+        'orderNumber': 'ORD-2',
+        'subtotal': '1000.00',
+        'discountAmount': '100.50',
+        'totalAmount': '899.50',
+        'deliveryAddress': 'House 1, Dhaka, Bangladesh',
+        'createdAt': '2026-01-01T10:00:00.000Z',
+        'items': [
+          {
+            'id': 'item-1',
+            'productName': 'PUBG UC',
+            'quantity': '2',
+            'price': '500.00',
+          }
+        ],
+      });
+
+      expect(order.subtotal, 1000.0);
+      expect(order.discountAmount, 100.50);
+      expect(order.totalAmount, 899.50);
+      expect(order.items.single.quantity, 2);
+      expect(order.items.single.total, 1000.0);
+    });
+
+    test('ReviewModel accepts string counts', () {
+      final review = ReviewModel.fromJson({
+        'id': 'rev-2',
+        'rating': '5',
+        'createdAt': '2026-02-01T12:00:00.000Z',
+        'helpfulCount': '10',
+      });
+      expect(review.rating, 5);
+      expect(review.helpfulCount, 10);
+      expect(review.userName, 'Anonymous');
+    });
+  });
 }
