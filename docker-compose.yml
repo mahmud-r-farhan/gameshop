@@ -9,8 +9,10 @@ services:
       POSTGRES_USER: ${DB_USER:-gameshop}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-gameshop_dev}
       POSTGRES_DB: ${DB_NAME:-gameshop_db}
+    # Docker publishes ports through its own iptables rules, bypassing ufw.
+    # Never expose the dev database (with its default password) on all interfaces.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +30,7 @@ services:
     container_name: gameshop_redis
     command: redis-server --requirepass ${REDIS_PASSWORD:-gameshop_redis} --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
