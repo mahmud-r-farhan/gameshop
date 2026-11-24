@@ -1,5 +1,6 @@
 import type { Server as HTTPServer } from 'node:http';
 import { Server, type Socket } from 'socket.io';
+import prisma from '../config/database.js';
 import { env } from '../config/env.js';
 import { USER_ROLES } from '../utils/constants.js';
 import { verifyAccessToken } from '../utils/tokens.js';
@@ -20,8 +21,26 @@ const userRoom = (userId: string) => `user:${userId}`;
 const orderRoom = (orderId: string) => `order:${orderId}`;
 const ADMIN_ROOM = 'admin-room';
 
+/** Ack payload for `order:subscribe`. Never carries a reason: see the join handler. */
+interface SubscribeAck {
+  ok: boolean;
+}
+type AckCallback = (response: SubscribeAck) => void;
+
 function log(message: string): void {
   if (!env.isTest && !env.isProd) console.log(message);
+}
+
+/** Unexpected failures still need a trace, without logging tokens or order IDs. */
+function logError(message: string, error: unknown): void {
+  if (env.isTest) return;
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      msg: message,
+      error: error instanceof Error ? error.message : 'unknown',
+    }),
+  );
 }
 
 export function setupSocketIO(httpServer: HTTPServer): Server {
@@ -68,14 +87,44 @@ export function setupSocketIO(httpServer: HTTPServer): Server {
       socket.join(ADMIN_ROOM);
     }
 
-    /** Let a client follow a specific order it owns. */
-    socket.on('order:subscribe', (orderId: unknown) => {
-      if (typeof orderId !== 'string' || orderId.length === 0 || orderId.length > 64) return;
-      socket.join(orderRoom(orderId));
+    /**
+     * Order rooms receive `order_update` and `payment_verified`, which include
+     * order status and payment details. Ownership is checked here rather than in
+     * a client, and a missing order and someone else's order get the *same*
+     * negative ack so this handler cannot be used to enumerate order IDs.
+     */
+    socket.on('order:subscribe', async (orderId: unknown, ack: unknown) => {
+      const respond: AckCallback = typeof ack === 'function' ? (ack as AckCallback) : () => undefined;
+
+      if (typeof orderId !== 'string' || orderId.length === 0 || orderId.length > 64) {
+        respond({ ok: false });
+        return;
+      }
+
+      try {
+        const isStaff = userRole === USER_ROLES.ADMIN || userRole === USER_ROLES.SUPER_ADMIN;
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: { userId: true },
+        });
+
+        if (!order || (!isStaff && order.userId !== userId)) {
+          respond({ ok: false });
+          return;
+        }
+
+        socket.join(orderRoom(orderId));
+        respond({ ok: true });
+      } catch (error) {
+        // Async socket listeners are outside Express's asyncHandler; an
+        // unhandled rejection here would terminate the whole API process.
+        respond({ ok: false });
+        logError('order_subscribe_failed', error);
+      }
     });
 
     socket.on('order:unsubscribe', (orderId: unknown) => {
-      if (typeof orderId !== 'string') return;
+      if (typeof orderId !== 'string' || orderId.length === 0 || orderId.length > 64) return;
       socket.leave(orderRoom(orderId));
     });
 

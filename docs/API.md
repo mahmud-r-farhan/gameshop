@@ -426,6 +426,35 @@ Content-Type: application/json
 PATCH /api/v1/admin/payment-gateways/:id/toggle
 ```
 
+## Realtime (Socket.io)
+
+Connect to the API origin with an access token in the handshake:
+`io('/', { auth: { token: accessToken } })`. Refresh, reset and invalid tokens are
+rejected at connection time.
+
+### Subscribe to an order
+
+```js
+socket.emit('order:subscribe', orderId, (ack) => {
+  // ack: { ok: true } | { ok: false }
+});
+```
+
+The server looks up the order and joins the caller to `order:<id>` only when the
+caller owns it, or has the `ADMIN` / `SUPER_ADMIN` role. A malformed ID, an ID
+that does not exist, and another customer's ID all produce the same
+`{ ok: false }` ack, so subscriptions cannot be used to enumerate orders.
+`socket.emit('order:unsubscribe', orderId)` leaves the room.
+
+| Event | Room | Payload |
+|---|---|---|
+| `order_update` | `user:<userId>` and `order:<id>` | `{ type: 'ORDER_UPDATE', data: order, timestamp }` |
+| `payment_verified` | `user:<userId>` and `order:<id>` | `{ type: 'PAYMENT_VERIFIED', orderId, message, timestamp }` |
+| `new_order` | admin room only | `{ type: 'NEW_ORDER', orderId, orderNumber, totalAmount, userId, timestamp }` |
+
+Clients without an ack callback are still subject to the same authorization
+check. The ack is optional only for backwards compatibility.
+
 ## Error Responses
 
 ```json
