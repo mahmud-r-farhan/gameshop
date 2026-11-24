@@ -128,7 +128,8 @@ void main() {
       );
 
       expect(find.text('Estimated subtotal'), findsOneWidget);
-      expect(find.text('BDT 3000'), findsOneWidget);
+      // One line total and one estimated subtotal; both are BDT 3000 here.
+      expect(find.text('BDT 3000'), findsNWidgets(2));
       expect(find.text('Tax (10%)'), findsNothing);
       expect(find.text('PayPal'), findsNothing);
       expect(find.text('Place Order'), findsOneWidget);
